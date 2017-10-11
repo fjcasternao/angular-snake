@@ -2,9 +2,8 @@ import {
   Component, Input, ElementRef, AfterViewInit, ViewChild, HostListener, OnInit, OnDestroy
 } from '@angular/core';
 
-import { Subscription } from "rxjs/Subscription";
 import 'rxjs/add/observable/fromEvent';
-import { Observable } from "rxjs/Observable";
+import { Point, Vector } from 'app/utils/vector';
 
 
 
@@ -22,19 +21,16 @@ export class AppComponent implements AfterViewInit {
   @ViewChild('canvas') public canvas: ElementRef;
 
   // setting a width and height for the canvas
-  @Input() public width = 400;
-  @Input() public height = 400;
+  @Input() public width = 200;
+  @Input() public height = 200;
 
   key;
 
-  position = {
-    x: 200,
-    y: 200
-  }
-
-  snakeLength = [
-    {x: 200, y: 200}, {x: 201, y: 200}, {x: 202, y: 200}
-  ]
+  snakeLength: Point[] = [];
+  score = 0;
+  timer;
+  growthCount = 0;
+  applePosition = new Point(0, 0);
 
   direction = null
 
@@ -55,42 +51,42 @@ export class AppComponent implements AfterViewInit {
     this.cx.strokeStyle = '#000';
 
     // we'll implement this method to start capturing mouse events
-    //this.captureEvents(canvasEl);
+    // this.captureEvents(canvasEl);
   }
 
-/*   private captureEvents(canvasEl: HTMLCanvasElement) {
-    Observable
-      // this will capture all mousedown events from teh canvas element
-      .vent(canvasEl, 'mousedown')
-      .switchMap((e) => {
-        return Observable
-          // after a mouse down, we'll record all mouse moves
-          .vent(canvasEl, 'mousemove')
-          // we'll stop (and unsubscribe) once the user releases the mouse
-          // this will trigger a mouseUp event
-          .takeUntil(Observable.vent(canvasEl, 'mouseup'))
-          // pairwise lets us get the previous value to draw a line from
-          // the previous point to the current point
-          .pairwise()
-      })
-      .subscribe((res) => {
-        const rect = canvasEl.getBoundingClientRect();
+  /*   private captureEvents(canvasEl: HTMLCanvasElement) {
+      Observable
+        // this will capture all mousedown events from teh canvas element
+        .vent(canvasEl, 'mousedown')
+        .switchMap((e) => {
+          return Observable
+            // after a mouse down, we'll record all mouse moves
+            .vent(canvasEl, 'mousemove')
+            // we'll stop (and unsubscribe) once the user releases the mouse
+            // this will trigger a mouseUp event
+            .takeUntil(Observable.vent(canvasEl, 'mouseup'))
+            // pairwise lets us get the previous value to draw a line from
+            // the previous point to the current point
+            .pairwise()
+        })
+        .subscribe((res) => {
+          const rect = canvasEl.getBoundingClientRect();
 
-        // previous and current position with the offset
-        const prevPos = {
-          x: res[0].clientX - rect.left,
-          y: res[0].clientY - rect.top
-        };
+          // previous and current position with the offset
+          const prevPos = {
+            x: res[0].clientX - rect.left,
+            y: res[0].clientY - rect.top
+          };
 
-        const currentPos = {
-          x: res[1].clientX - rect.left,
-          y: res[1].clientY - rect.top
-        };
+          const currentPos = {
+            x: res[1].clientX - rect.left,
+            y: res[1].clientY - rect.top
+          };
 
-        // this method we'll implement soon to do the actual drawing
-        this.drawOnCanvas(prevPos, currentPos);
-      });
-  } */
+          // this method we'll implement soon to do the actual drawing
+          this.drawOnCanvas(prevPos, currentPos);
+        });
+    } */
 
   private drawOnCanvas(
     prevPos: { x: number, y: number },
@@ -118,7 +114,7 @@ export class AppComponent implements AfterViewInit {
   @HostListener('document:keypress', ['$event'])
   handleKeyboardEvent(event: KeyboardEvent) {
     this.key = event.key;
-    let newPosition = { ...this.position };
+    const newPosition = this.snakeLength[this.snakeLength.length - 1].clone();
     if (event.key === 'ArrowLeft') { // left
       this.direction = 'left'
     } else if (event.key === 'ArrowUp') { // up
@@ -129,12 +125,11 @@ export class AppComponent implements AfterViewInit {
       this.direction = 'down'
     }
 
-    this.drawOnCanvas(this.position, newPosition)
-    this.position = newPosition;
+    this.drawOnCanvas(this.snakeLength[this.snakeLength.length - 1], newPosition)
   }
 
   drawNewPosition() {
-    const newPosition = { ...this.position };
+    const newPosition = this.snakeLength[this.snakeLength.length - 1].clone();
     if (this.direction === 'left') {
       newPosition.x -= 1;
     } else if (this.direction === 'up') {
@@ -147,10 +142,16 @@ export class AppComponent implements AfterViewInit {
       return;
     }
 
-    this.snakeLength.unshift();
-    this.snakeLength.push(this.position);
+    if (!this.growthCount) {
+      this.snakeLength.shift();
+    } else {
+      this.growthCount--;
+    }
+
+    console.log(newPosition)
+    this.snakeLength.push(newPosition);
     this.drawSnake();
-    this.position = newPosition;
+    this.checkAppleEating();
   }
 
 
@@ -163,19 +164,157 @@ export class AppComponent implements AfterViewInit {
     })
   }
 
+  checkAppleEating() {
+    const snakeHead = this.snakeLength[this.snakeLength.length - 1];
+    if (Math.abs(snakeHead.x - this.applePosition.x) < 3 && Math.abs(snakeHead.y - this.applePosition.y) < 3) {
+      // Eat apple
+      this.score++;
+      this.growthCount += 10;
+      this.generateApple();
+    }
+    this.drawApple(this.applePosition);
+  }
+
+  isValidPosition(destPoint: Point): boolean {
+
+    if (destPoint.x > this.width || destPoint. x < 0 || destPoint.y < 0 || destPoint.y > this.height) {
+      return false;
+    }
+
+    for (let i = 0; i < this.snakeLength.length; i++) {
+      const snakeBody = this.snakeLength[i];
+      if (snakeBody.isEqual(destPoint)) {
+        console.log('Invalid position');
+        return false;
+      }
+    }
+    return true;
+  }
+
+  generateApple() {
+    this.applePosition = new Point(Math.round(Math.random() * 200), Math.round(Math.random() * 200));
+  }
+
+  drawApple(applePosition) {
+    this.cx.fillStyle = 'red';
+    this.cx.fillRect(applePosition.x, applePosition.y, 3, 3); // fill in the pixel at (10,10)
+  }
+
+  initSnake() {
+    this.snakeLength = [];
+    for (let i = 0; i < 5; i++) {
+      this.snakeLength.push(new Point(1 + i, 1));
+    }
+  }
 
   reset(): void {
     this.cx.clearRect(0, 0, this.width, this.height);
-    this.position = {
-      x: 200,
-      y: 200
-    }
     this.direction = null;
+    this.initSnake();
+    this.generateApple();
+    this.drawApple(this.applePosition);
 
-    setInterval(() => {
-      this.drawNewPosition(); }, 16);
+    clearInterval(this.timer);
+
+    this.timer = setInterval(() => {
+      this.snakeIA();
+      this.drawNewPosition();
+    }, 8);
+  }
+
+  snakeIA(): void {
+    const snakeHead = this.snakeLength[this.snakeLength.length - 1];
+    const positions = this.getOptimumPositions(this.direction, snakeHead, this.applePosition);
+
+    let validPosition = false;
+
+    for (let i = 0; i < positions.length; i++) {
+      const possiblePosition = positions[i];
+      if (this.isValidPosition(possiblePosition)) {
+        if (possiblePosition.x - snakeHead.x !== 0) {
+          (possiblePosition.x - snakeHead.x) < 0 ? this.direction = 'left' : this.direction = 'right'
+        } else if (possiblePosition.y - snakeHead.y !== 0) {
+          (possiblePosition.y - snakeHead.y) < 0 ? this.direction = 'up' : this.direction = 'down'
+        }
+        console.log(positions[i]);
+        validPosition = true;
+        break;
+      }
     }
+    if (!validPosition) {
+      console.error('Sin movimientos')
+      clearInterval(this.timer);
+    }
+  }
+
+  getOptimumPositions(direction: string, presentPosition: Point, desiredPosition: Point) {
+    const posiblePositions = this.getPossiblePositions(direction, presentPosition);
+    const dirVector = new Vector(desiredPosition.x - presentPosition.x, desiredPosition.y - presentPosition.y);
+    const minDirection = dirVector.maxAxis();
+
+    let sortingPre
+    if (minDirection === 'x') {
+      sortingPre = presentPosition[minDirection] - desiredPosition[minDirection] < 0 ? '-' : ''
+    } else {
+      sortingPre = presentPosition[minDirection] - desiredPosition[minDirection] < 0 ? '-' : ''
+    }
+
+    return posiblePositions.sort(this.dynamicSort(sortingPre + minDirection));
+  }
+
+  dynamicSort(property) {
+    let sortOrder = 1;
+    if (property[0] === '-') {
+      sortOrder = -1;
+      property = property.substr(1);
+    }
+    return function (a, b) {
+      const result = (a[property] < b[property]) ? -1 : (a[property] > b[property]) ? 1 : 0;
+      return result * sortOrder;
+    }
+  }
+
+
+  getPossiblePositions(direction: string, presentPosition: Point): Point[] {
+    switch (direction) {
+      case 'left':
+        return [
+          new Point(presentPosition.x - 1, presentPosition.y),
+          new Point(presentPosition.x, presentPosition.y + 1),
+          new Point(presentPosition.x, presentPosition.y - 1),
+        ];
+      case 'right':
+        return [
+          new Point(presentPosition.x + 1, presentPosition.y),
+          new Point(presentPosition.x, presentPosition.y + 1),
+          new Point(presentPosition.x, presentPosition.y - 1),
+        ];
+
+      case 'up':
+        return [
+          new Point(presentPosition.x, presentPosition.y - 1),
+          new Point(presentPosition.x + 1, presentPosition.y),
+          new Point(presentPosition.x - 1, presentPosition.y),
+        ];
+
+      case 'down':
+        return [
+          new Point(presentPosition.x, presentPosition.y + 1),
+          new Point(presentPosition.x + 1, presentPosition.y),
+          new Point(presentPosition.x - 1, presentPosition.y),
+        ];
+      default:
+        return [
+          new Point(presentPosition.x, presentPosition.y - 1),
+          new Point(presentPosition.x, presentPosition.y + 1),
+          new Point(presentPosition.x + 1, presentPosition.y),
+        ];
+    }
+
+  }
+
 
 }
+
 
 
