@@ -73,6 +73,8 @@ export class Vector {
 export class Point {
     x: number;
     y: number;
+    //color: string;
+
     constructor(x, y) {
         this.x = x;
         this.y = y;

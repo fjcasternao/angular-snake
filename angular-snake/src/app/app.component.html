@@ -1,6 +1,5 @@
 <canvas #canvas></canvas>
 <button (click) = "reset()">Reset</button>
-<span>{{score}}</span>
 <div class="row">
-    <div class="col-md-2" *ngFor="let snake of snakePool">{{snake.snakeLength.length}}</div>
+    <div class="col-md-2" *ngFor="let snake of snakePool" [ngStyle]="{'color': snake.color}">{{snake.snakeLength.length}}</div>
 </div>

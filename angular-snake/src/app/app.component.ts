@@ -25,10 +25,7 @@ export class AppComponent implements AfterViewInit {
   @Input() public width = 200;
   @Input() public height = 200;
 
-  key;
-
   snakePool: Snake[] = [];
-  score = 0;
   timer;
   applePosition = new Point(0, 0);
 
@@ -96,7 +93,7 @@ export class AppComponent implements AfterViewInit {
 
     // start our drawing path
     this.cx.beginPath();
-    this.cx.strokeStyle = color;
+    this.cx.strokeStyle = color // Math.round(Math.random()) > 0 ? color : 'white';
     // we're drawing lines so we need a previous position
     if (prevPos) {
       // sets the start point
@@ -112,16 +109,47 @@ export class AppComponent implements AfterViewInit {
 
   @HostListener('document:keypress', ['$event'])
   handleKeyboardEvent(event: KeyboardEvent) {
-    this.key = event.key;
 
     if (event.key === 'ArrowLeft') { // left
-      this.snakePool[0].direction = 'left'
+      if (this.snakePool[0].direction !== 'right') {
+        this.snakePool[0].direction = 'left'
+      }
     } else if (event.key === 'ArrowUp') { // up
-      this.snakePool[0].direction = 'up'
+      if (this.snakePool[0].direction !== 'down') {
+        this.snakePool[0].direction = 'up'
+      }
     } else if (event.key === 'ArrowRight') { // right
-      this.snakePool[0].direction = 'right'
+      if (this.snakePool[0].direction !== 'left') {
+        this.snakePool[0].direction = 'right'
+      }
     } else if (event.key === 'ArrowDown') { // down
-      this.snakePool[0].direction = 'down'
+      if (this.snakePool[0].direction !== 'up') {
+        this.snakePool[0].direction = 'down'
+      }
+    }
+
+    switch (event.key) {
+      case 'd': // d
+        if (this.snakePool[1].direction !== 'left') {
+          this.snakePool[1].direction = 'right'
+        }
+        break;
+      case 's': // s
+        if (this.snakePool[1].direction !== 'up') {
+          this.snakePool[1].direction = 'down'
+        }
+        break;
+      case 'a': // a
+        if (this.snakePool[1].direction !== 'right') {
+          this.snakePool[1].direction = 'left'
+        }
+        break;
+      case 'w': // w
+
+        if (this.snakePool[1].direction !== 'down') {
+          this.snakePool[1].direction = 'up'
+        }
+        break;
     }
 
     //this.drawOnCanvas(this.snakeLength[this.snakeLength.length - 1], newPosition)
@@ -148,9 +176,16 @@ export class AppComponent implements AfterViewInit {
       snake.growthCount--;
     }
 
-    snake.snakeLength.push(newPosition);
-    this.drawSnake(snake);
-    this.checkAppleEating(snake);
+    if (this.isValidPosition(newPosition)) {
+      snake.snakeLength.push(newPosition);
+      this.drawSnake(snake);
+      this.checkAppleEating(snake);
+    } else {
+
+      clearInterval(this.timer);
+      //this.removeSnake(snake);
+    }
+
   }
 
 
@@ -203,19 +238,19 @@ export class AppComponent implements AfterViewInit {
 
     this.snakePool = [];
 
-    const colors = ['red', 'blue', 'green', 'yellow', 'black'];
+    const colors = ['#e61cdd', '#7a520b', 'green', 'yellow', 'black'];
 
-    for (let i = 0 ; i < 5; i++) {
+    for (let i = 0; i < 1; i++) {
       const snake = new Snake(new Point(30 * i, 30 * i), colors[i], i);
       this.snakePool.push(snake);
     }
 
-/*     const snake1 = new Snake(new Point(1, 1), '#1dcfbf');
-    this.snakePool.push(snake1);
+    /*  const snake1 = new Snake(new Point(1, 1), '#1dcfbf');
+        this.snakePool.push(snake1);
 
-    const snake2 = new Snake(new Point(100, 1), 'blue');
-    this.snakePool.push(snake2);
- */
+        const snake2 = new Snake(new Point(100, 1), 'blue');
+        this.snakePool.push(snake2);
+     */
     this.generateApple();
     this.drawApple(this.applePosition);
 
@@ -225,10 +260,10 @@ export class AppComponent implements AfterViewInit {
       this.cx.clearRect(0, 0, this.width, this.height);
       this.snakePool.forEach((snake, index) => {
         //this.cx.clearRect(0, 0, this.width, this.height);
-        this.snakeIA(snake);
+        //this.snakeIA(snake);
         this.drawNewPosition(snake);
       })
-    }, 8);
+    }, 16);
   }
 
   snakeIA(snake: Snake): void {
@@ -337,7 +372,7 @@ export class Snake {
   score: 0;
   color: string;
   id: number;
-  _direction = null;
+  _direction = 'down';
 
   constructor(startingPoint: Point, color: string, id: number) {
     this.initSnake(startingPoint);
