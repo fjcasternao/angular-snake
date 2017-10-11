@@ -16,6 +16,7 @@ import { Point, Vector } from 'app/utils/vector';
     '(document:keydown)': 'handleKeyboardEvent($event)'
   }
 })
+
 export class AppComponent implements AfterViewInit {
   // a reference to the canvas element from our template
   @ViewChild('canvas') public canvas: ElementRef;
@@ -26,13 +27,10 @@ export class AppComponent implements AfterViewInit {
 
   key;
 
-  snakeLength: Point[] = [];
+  snakePool: Snake[] = [];
   score = 0;
   timer;
-  growthCount = 0;
   applePosition = new Point(0, 0);
-
-  direction = null
 
   private cx: CanvasRenderingContext2D;
 
@@ -90,14 +88,15 @@ export class AppComponent implements AfterViewInit {
 
   private drawOnCanvas(
     prevPos: { x: number, y: number },
-    currentPos: { x: number, y: number }
+    currentPos: { x: number, y: number },
+    color: string
   ) {
     // incase the context is not set
     if (!this.cx) { return; }
 
     // start our drawing path
     this.cx.beginPath();
-
+    this.cx.strokeStyle = color;
     // we're drawing lines so we need a previous position
     if (prevPos) {
       // sets the start point
@@ -114,62 +113,61 @@ export class AppComponent implements AfterViewInit {
   @HostListener('document:keypress', ['$event'])
   handleKeyboardEvent(event: KeyboardEvent) {
     this.key = event.key;
-    const newPosition = this.snakeLength[this.snakeLength.length - 1].clone();
+
     if (event.key === 'ArrowLeft') { // left
-      this.direction = 'left'
+      this.snakePool[0].direction = 'left'
     } else if (event.key === 'ArrowUp') { // up
-      this.direction = 'up'
+      this.snakePool[0].direction = 'up'
     } else if (event.key === 'ArrowRight') { // right
-      this.direction = 'right'
+      this.snakePool[0].direction = 'right'
     } else if (event.key === 'ArrowDown') { // down
-      this.direction = 'down'
+      this.snakePool[0].direction = 'down'
     }
 
-    this.drawOnCanvas(this.snakeLength[this.snakeLength.length - 1], newPosition)
+    //this.drawOnCanvas(this.snakeLength[this.snakeLength.length - 1], newPosition)
   }
 
-  drawNewPosition() {
-    const newPosition = this.snakeLength[this.snakeLength.length - 1].clone();
-    if (this.direction === 'left') {
+  drawNewPosition(snake: Snake) {
+
+    const newPosition = snake.getHead().clone();
+    if (snake.direction === 'left') {
       newPosition.x -= 1;
-    } else if (this.direction === 'up') {
+    } else if (snake.direction === 'up') {
       newPosition.y -= 1;
-    } else if (this.direction === 'right') {
+    } else if (snake.direction === 'right') {
       newPosition.x += 1;
-    } else if (this.direction === 'down') {
+    } else if (snake.direction === 'down') {
       newPosition.y += 1;
     } else {
       return;
     }
 
-    if (!this.growthCount) {
-      this.snakeLength.shift();
+    if (!snake.growthCount) {
+      snake.snakeLength.shift();
     } else {
-      this.growthCount--;
+      snake.growthCount--;
     }
 
-    console.log(newPosition)
-    this.snakeLength.push(newPosition);
-    this.drawSnake();
-    this.checkAppleEating();
+    snake.snakeLength.push(newPosition);
+    this.drawSnake(snake);
+    this.checkAppleEating(snake);
   }
 
 
-  drawSnake() {
-    this.cx.clearRect(0, 0, this.width, this.height);
-    this.snakeLength.forEach((point, i) => {
-      if ((i + 1) < this.snakeLength.length) {
-        this.drawOnCanvas(point, this.snakeLength[i + 1])
+  drawSnake(snake: Snake) {
+    snake.snakeLength.forEach((point, i) => {
+      if ((i + 1) < snake.snakeLength.length) {
+        this.drawOnCanvas(point, snake.snakeLength[i + 1], snake.color)
       }
     })
   }
 
-  checkAppleEating() {
-    const snakeHead = this.snakeLength[this.snakeLength.length - 1];
+  checkAppleEating(snake: Snake) {
+    const snakeHead = snake.getHead();
     if (Math.abs(snakeHead.x - this.applePosition.x) < 3 && Math.abs(snakeHead.y - this.applePosition.y) < 3) {
       // Eat apple
-      this.score++;
-      this.growthCount += 10;
+      snake.score++;
+      snake.growthCount += 10;
       this.generateApple();
     }
     this.drawApple(this.applePosition);
@@ -177,14 +175,13 @@ export class AppComponent implements AfterViewInit {
 
   isValidPosition(destPoint: Point): boolean {
 
-    if (destPoint.x > this.width || destPoint. x < 0 || destPoint.y < 0 || destPoint.y > this.height) {
+    if (destPoint.x > this.width || destPoint.x < 0 || destPoint.y < 0 || destPoint.y > this.height) {
       return false;
     }
 
-    for (let i = 0; i < this.snakeLength.length; i++) {
-      const snakeBody = this.snakeLength[i];
-      if (snakeBody.isEqual(destPoint)) {
-        console.log('Invalid position');
+    for (let i = 0; i < this.snakePool.length; i++) {
+      const snake = this.snakePool[i];
+      if (snake.hasPoint(destPoint)) {
         return false;
       }
     }
@@ -200,51 +197,69 @@ export class AppComponent implements AfterViewInit {
     this.cx.fillRect(applePosition.x, applePosition.y, 3, 3); // fill in the pixel at (10,10)
   }
 
-  initSnake() {
-    this.snakeLength = [];
-    for (let i = 0; i < 5; i++) {
-      this.snakeLength.push(new Point(1 + i, 1));
-    }
-  }
 
   reset(): void {
     this.cx.clearRect(0, 0, this.width, this.height);
-    this.direction = null;
-    this.initSnake();
+
+    this.snakePool = [];
+
+    const colors = ['red', 'blue', 'green', 'yellow', 'black'];
+
+    for (let i = 0 ; i < 5; i++) {
+      const snake = new Snake(new Point(30 * i, 30 * i), colors[i], i);
+      this.snakePool.push(snake);
+    }
+
+/*     const snake1 = new Snake(new Point(1, 1), '#1dcfbf');
+    this.snakePool.push(snake1);
+
+    const snake2 = new Snake(new Point(100, 1), 'blue');
+    this.snakePool.push(snake2);
+ */
     this.generateApple();
     this.drawApple(this.applePosition);
 
     clearInterval(this.timer);
 
     this.timer = setInterval(() => {
-      this.snakeIA();
-      this.drawNewPosition();
+      this.cx.clearRect(0, 0, this.width, this.height);
+      this.snakePool.forEach((snake, index) => {
+        //this.cx.clearRect(0, 0, this.width, this.height);
+        this.snakeIA(snake);
+        this.drawNewPosition(snake);
+      })
     }, 8);
   }
 
-  snakeIA(): void {
-    const snakeHead = this.snakeLength[this.snakeLength.length - 1];
-    const positions = this.getOptimumPositions(this.direction, snakeHead, this.applePosition);
+  snakeIA(snake: Snake): void {
+    const snakeHead = snake.getHead();
+    const positions = this.getOptimumPositions(snake.direction, snakeHead, this.applePosition);
 
     let validPosition = false;
-
     for (let i = 0; i < positions.length; i++) {
       const possiblePosition = positions[i];
       if (this.isValidPosition(possiblePosition)) {
         if (possiblePosition.x - snakeHead.x !== 0) {
-          (possiblePosition.x - snakeHead.x) < 0 ? this.direction = 'left' : this.direction = 'right'
+          (possiblePosition.x - snakeHead.x) < 0 ? snake.direction = 'left' : snake.direction = 'right'
         } else if (possiblePosition.y - snakeHead.y !== 0) {
-          (possiblePosition.y - snakeHead.y) < 0 ? this.direction = 'up' : this.direction = 'down'
+          (possiblePosition.y - snakeHead.y) < 0 ? snake.direction = 'up' : snake.direction = 'down'
         }
-        console.log(positions[i]);
         validPosition = true;
         break;
       }
     }
     if (!validPosition) {
       console.error('Sin movimientos')
-      clearInterval(this.timer);
+      this.removeSnake(snake);
+      //  TODO: sacar la culebra del array
+      if (this.snakePool.length === 0) {
+        clearInterval(this.timer);
+      }
     }
+  }
+
+  removeSnake(snake: Snake) {
+    this.snakePool.splice(this.snakePool.indexOf(snake), 1);
   }
 
   getOptimumPositions(direction: string, presentPosition: Point, desiredPosition: Point) {
@@ -258,7 +273,6 @@ export class AppComponent implements AfterViewInit {
     } else {
       sortingPre = presentPosition[minDirection] - desiredPosition[minDirection] < 0 ? '-' : ''
     }
-
     return posiblePositions.sort(this.dynamicSort(sortingPre + minDirection));
   }
 
@@ -313,6 +327,52 @@ export class AppComponent implements AfterViewInit {
 
   }
 
+
+}
+
+
+export class Snake {
+  snakeLength: Point[] = [];
+  growthCount = 0;
+  score: 0;
+  color: string;
+  id: number;
+  _direction = null;
+
+  constructor(startingPoint: Point, color: string, id: number) {
+    this.initSnake(startingPoint);
+    this.color = color;
+    this.id = id;
+  }
+
+  private initSnake(startingPoint: Point) {
+    this.snakeLength = [];
+    for (let i = 0; i < 5; i++) {
+      this.snakeLength.push(new Point(startingPoint.x + i, startingPoint.y));
+    }
+  }
+
+  hasPoint(destPoint: Point): boolean {
+    for (let i = 0; i < this.snakeLength.length; i++) {
+      const snakeBody = this.snakeLength[i];
+      if (snakeBody.isEqual(destPoint)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  getHead(): Point {
+    return this.snakeLength[this.snakeLength.length - 1];
+  }
+
+  public get direction(): string {
+    return this._direction;
+  }
+
+  public set direction(value: string) {
+    this._direction = value;
+  }
 
 }
 
